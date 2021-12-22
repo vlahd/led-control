@@ -14,6 +14,7 @@ import ledcontrol.animationpatterns as animpatterns
 import ledcontrol.colorpalettes as colorpalettes
 import ledcontrol.driver as driver
 import ledcontrol.utils as utils
+import RPi.GPIO as GPIO
 
 class AnimationController:
     def __init__(self,
@@ -84,6 +85,10 @@ class AnimationController:
         self.reset_timer()
         self.time = 0
         self.update_needed = True # Is the LED state going to change this frame?
+        self.running = True
+
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(14, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
         # Initialize sACN / E1.31
         if enable_sacn:
@@ -299,10 +304,38 @@ class AnimationController:
         'Delete palette'
         del self.palettes[key]
 
+    def begin_control_thread(self):
+        'Start control thread'
+        self.control_timer = IntervalTimer(1.0 / self.refresh_rate, self.check_control_pin)
+        self.control_timer.start()
+
     def begin_animation_thread(self):
         'Start animating'
         self.timer = IntervalTimer(1.0 / self.refresh_rate, self.update_leds)
+        self.timer.enable_debug = True
         self.timer.start()
+
+    def check_control_pin(self):
+        should_run = GPIO.input(14)
+        if should_run == self.running:
+            return
+
+        if should_run:
+            self.unpause_animation()
+        else:
+            self.pause_animation()
+
+        self.running = should_run
+
+    def pause_animation(self):
+        print("Pausing animation...")
+        self.end_animation()
+        self.clear_leds()
+
+    def unpause_animation(self):
+        print("Unpausing animation...")
+        self.begin_animation_thread()
+        self.update_needed = True
 
     def update_leds(self):
         'Determine time, render frame, and display'
@@ -424,3 +457,6 @@ class AnimationController:
                 self._receiver.stop()
         except:
             pass
+
+    def end_control_thread(self):
+        self.control_timer.stop()

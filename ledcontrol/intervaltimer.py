@@ -17,6 +17,7 @@ class IntervalTimer:
         self.perf_avg = 0
         self.event = Event()
         self.thread = Thread(target=self.target, daemon=True)
+        self.enable_debug = False
 
     def start(self):
         'Starts the timer thread'
@@ -30,7 +31,7 @@ class IntervalTimer:
             self.perf_avg += (time.perf_counter() - self.last_start)
 
             self.count += 1
-            if self.count % 100 == 0:
+            if self.count % 100 == 0 and self.enable_debug:
                 print('Average execution time (s): {}'.format(self.perf_avg / 100))
                 print('Average speed (cycles/s): {}'.format(self.get_rate()))
                 self.perf_avg = 0
